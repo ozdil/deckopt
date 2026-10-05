@@ -1,14 +1,19 @@
-# deckopt: Valve Steam Deck için YZ Destekli Otonom Oyun Optimizasyon Motoru (Alfa v0.1.0)
+# deckopt: AI-Driven Autonomous Game Optimization Engine for Valve Steam Deck (Alpha v0.1.0)
 
-Valve Steam Deck donanımları (LCD "Jupiter" ve OLED "Galileo") ile SteamOS 3.x çalışma zamanı için özel olarak geliştirilmiş, hibrit yapay zeka destekli yerleşik oyun optimizasyon motoru ve yönetim arayüzüdür.
+[![Release](https://img.shields.io/github/v/release/ozdil/deckopt?include_prereleases)](https://github.com/ozdil/deckopt/releases)
+[![Platform](https://img.shields.io/badge/platform-SteamOS%203.x%20%7C%20Steam%20Deck-1a9fff)](https://store.steampowered.com/steamdeck)
+[![Engine](https://img.shields.io/badge/engine-Godot%204.7-478cbf)](https://godotengine.org)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-Bu yazılım yalnızca Valve Steam Deck donanımı üzerinde çalışacak şekilde platform kilidine sahiptir. Farklı bir sistemde çalıştırıldığında DMI/BIOS seviyesinde devreye giren donanım kilidi sayesinde yürütmeyi güvenle durdurur.
+**deckopt** is an autonomous, on-device AI-powered performance tuning and game optimization engine engineered specifically for Valve Steam Deck hardware (LCD "Jupiter" and OLED "Galileo") running SteamOS 3.x.
+
+It eliminates the tedious trial-and-error process of manually researching TDP limits, GPU clocks, FSR configurations, and Proton launch flags on forums. By leveraging Google Gemini 2.5 Flash and strict deterministic hardware safety boundaries, `deckopt` calculates optimal, battery-conscious per-game profiles with zero guesswork.
+
+> **Hardware Enforced:** This software strictly operates on authentic Valve Steam Deck hardware. Running it on non-Deck environments triggers a BIOS-level hardware lock that halts execution safely.
 
 ---
 
-## 1. Mimari Genel Bakış
-
-deckopt, kullanıcıların oyun bazında saatlerce TDP, GPU frekansı, FSR ölçekleme ve başlatma parametresi denemesi yapma zorunluluğunu ortadan kaldırır. 
+## Architecture Overview
 
 ```
 +-------------------------------------------------------------------------+
@@ -16,8 +21,8 @@ deckopt, kullanıcıların oyun bazında saatlerce TDP, GPU frekansı, FSR ölç
 +-------------------------------------------------------------------------+
        |                                                    |
        v                                                    v
- [Dahili NVMe / MicroSD]                            [DMI BIOS Kontrolü]
- Appmanifest ACF Taraması                        (Jupiter LCD / Galileo OLED)
+ [Internal NVMe / MicroSD]                           [DMI BIOS Validation]
+ Appmanifest ACF Parsing                          (Jupiter LCD / Galileo OLED)
        |                                                    |
        +--------------------+-------------------------------+
                             |
@@ -29,97 +34,103 @@ deckopt, kullanıcıların oyun bazında saatlerce TDP, GPU frekansı, FSR ölç
                             |
                             v
                +---------------------------+
-               |  Yerel Guvenlik & Depo    |  <-- user://gemini.key (0600)
-               |  Store & Profile Engine   |  <-- user://profiles.json (0600)
+               |  Secure Local Storage     |  <-- user://gemini.key (0600)
+               |  Profile & Store Engine   |  <-- user://profiles.json (0600)
                +---------------------------+
                             |
-                            | (HTTPS REST / Yalnizca Oyun Adi + AppID + Donanim)
+                            | (HTTPS REST / Game Name + AppID + Target SoC)
                             v
                +---------------------------+
                |  Google Gemini 2.5 Flash  |
                +---------------------------+
                             |
-                            v (Ham JSON)
+                            v (Structured JSON Payload)
                +---------------------------+
-               |  Katı Sanitization Katmanı|  <-- TDP: [3, 15] W
-               |  (profile.gd / Limits)    |  <-- GPU: [200, 1600] MHz
-               +---------------------------+  <-- FPS: Hz Tam Boleni [30, 90]
+               | Deterministic Sanitizer   |  <-- TDP: [3, 15] W
+               |  (profile.gd Hardware Cap)|  <-- GPU: [200, 1600] MHz
+               +---------------------------+  <-- FPS: Frame Pacing Divisor
                             |
                             v
         +----------------------------------------+
-        | Nihai Onerilen Profil & Parametreler   |
-        | - Quick Access Menu Yonergeleri        |
-        | - Steam Baslatma Secenekleri (Panoya)  |
+        | Final Recommended Profile & Parameters |
+        | - Quick Access Menu Directives         |
+        | - Steam Launch Options (To Clipboard)  |
         +----------------------------------------+
 ```
 
 ---
 
-## 2. Temel Bileşenler ve Teknik Özellikler
+## Key Features and Technical Highlights
 
-### A. Donanım ve Platform Kilidi (`deck_scan.gd`)
-- `/sys/devices/virtual/dmi/id/product_name` arayüzünü denetler.
-- Yalnızca `jupiter` (Steam Deck LCD, Aerith APU, 60Hz) ve `galileo` (Steam Deck OLED, Sephiroth 6nm APU, 90Hz) donanımlarını kabul eder.
-- SteamOS 3.x kütüphane yollarını (`/home/deck/.local/share/Steam/steamapps` ve `/run/media/mmcblk0p1/steamapps`) otomatik tarayarak kurulu oyunları listeler.
+### 1. BIOS-Level Hardware Verification (`deck_scan.gd`)
+- Reads `/sys/devices/virtual/dmi/id/product_name`.
+- Strictly targets `jupiter` (Steam Deck LCD, AMD Aerith 7nm APU, 60Hz) and `galileo` (Steam Deck OLED, AMD Sephiroth 6nm APU, 90Hz).
+- Automatically discovers installed titles across both internal storage (`~/.local/share/Steam/steamapps`) and MicroSD cards (`/run/media/mmcblk0p1/steamapps`).
 
-### B. Hibrit YZ Motoru (`gemini.gd`)
-- Kütüphanedeki her oyun için hedef donanım profilini (Aerith/Sephiroth, ekran tavan tazeleme hızı) temel alarak Google Gemini API üzerinden oyun motoruna özel profil üretir.
-- **Güvenli API İletişimi:** Kullanıcının API anahtarı hiçbir uzak sunucuya aktarılmaz; yalnızca doğrudan Google AI Studio uç noktasına iletilir ve yerel cihazda `0600` izinleriyle izole edilir.
+### 2. Hybrid AI Engine (`gemini.gd`)
+- Queries Google Gemini 2.5 Flash to compute optimal thermal, rendering, and frame pacing parameters based on game engine characteristics and Deck hardware specs.
+- **Client-Side Privacy:** Your Gemini API key is stored strictly on-device under `user://gemini.key` with `0600` permissions. It is never relayed through third-party telemetry servers.
 
-### C. Deterministik Güvenlik Katmanı (`profile.gd`)
-Büyük dil modellerinin çıktısına donanım seviyesinde asla doğrudan güvenilmez. Tüm değerler katı sınır filtrelerinden geçirilir:
-- **TDP Güç Sınırı:** 3 Watt ile 15 Watt arasına zorunlu kırpılır.
-- **GPU Saat Frekansı:** 200 MHz ile 1600 MHz arasına zorunlu kırpılır.
-- **Kare Hızı & Tazeleme Uyumu:** Kare süresi tutarlılığı (frame pacing) için FPS sınırı ekran tazeleme hızının tam böleni (`refresh_hz % fps_limit == 0`) olmaya zorlanır (Örn: 60Hz ekranda 60, 30; 90Hz ekranda 90, 45, 30).
-- **Ortam Değişkeni Beyaz Listesi:** Yalnızca güvenli Wine/Proton/Mesa bayraklarına (`PROTON_USE_WINED3D`, `DXVK_ASYNC`, `DXVK_FRAME_RATE`, `WINE_FULLSCREEN_FSR`, `mesa_glthread` vb.) izin verilir. Zararlı kabuk komutları elenir.
+### 3. Deterministic Safety Boundaries (`profile.gd`)
+LLM outputs are inherently probabilistic and cannot be trusted directly with hardware governance. Every AI-generated profile must pass through deterministic bounding filters:
+- **TDP Clamping:** Hard-clamped within `[3, 15]` Watts.
+- **GPU Clock Limits:** Constrained between `[200, 1600]` MHz.
+- **Mathematical Frame Pacing:** Target frame rates must be an exact integer divisor of the panel refresh rate (`refresh_hz % fps_limit == 0`) to prevent micro-stuttering (e.g., 30 FPS or 60 FPS on 60Hz LCD; 30, 45, or 90 FPS on 90Hz OLED).
+- **Flag Allowlist:** Shell commands are strictly filtered. Only verified Proton/Mesa/Vulkan flags (`PROTON_USE_WINED3D`, `DXVK_ASYNC`, `DXVK_FRAME_RATE`, `WINE_FULLSCREEN_FSR`, `mesa_glthread`) are allowed. Command injectors (`;`, `&`, `|`, `` ` ``) are stripped immediately.
 
-### D. Gamepad Odaklı Arayüz (`main.gd`)
-- Godot 4.7 tabanlı, 1280x800 Steam Deck ekran çözünürlüğüne optimize edilmiş tam ekran arayüz.
-- D-Pad ve analog çubukla sorunsuz menü navigasyonu (A: Seç, B: Geri, D-Pad: Gezin).
-- "Tüm oyunları optimize et", "Oyun listesi", "API anahtarı yönetimi" ve "Tek tuşla panoya kopyalama".
-- Asenkron optimizasyon sürecini istenildiği anda durduran iptal emniyeti.
+### 4. Gamepad-Native Interface (`main.gd`)
+- Built in **Godot 4.7 Engine**, rendered natively at 1280x800 for the Steam Deck display.
+- Seamless D-Pad and controller navigation out-of-the-box (A: Select, B: Back, D-Pad: Navigate).
+- Single-click clipboard copying for launch options and asynchronous cancel safety during batch optimizations.
 
 ---
 
-## 3. Kurulum (Steam Deck)
+## One-Line Installation (Steam Deck)
 
-Steam Deck üzerinde Masaüstü Moduna (Desktop Mode) geçip Konsole uygulamasında aşağıdaki tek komutu çalıştırmanız yeterlidir:
+Switch to **Desktop Mode** on your Steam Deck, open **Konsole**, and paste:
 
 ```bash
 curl -fsSL https://github.com/ozdil/deckopt/releases/latest/download/install.sh | bash
 ```
 
-### Kurulum Betiğinin Yaptığı İşlemler:
-1. Donanımın Steam Deck olduğunu BIOS düzeyinde doğrular.
-2. Sürüm paketini ve SHA256 sağlama toplamını indirerek kriptografik doğrulama yapar.
-3. Uygulamayı `~/Applications/deckopt/` dizinine yerleştirir.
-4. `steamos-add-to-steam` aracılığıyla kısayolu doğrudan Steam kütüphanenize "Steam Dışı Oyun" olarak ekler.
-5. Game Mode'a döndüğünüzde **deckopt** uygulamasını kütüphanenizde doğrudan görebilir ve oyun kumandasıyla başlatabilirsiniz.
+### What This Script Does:
+1. Validates that the host machine is an authentic Steam Deck (Jupiter/Galileo).
+2. Downloads the latest verified release and validates its SHA256 checksum.
+3. Installs the standalone executable into `~/Applications/deckopt/`.
+4. Registers `deckopt` directly into your Steam Library as a "Non-Steam Game" via `steamos-add-to-steam`.
+
+Return to **Gaming Mode**, and `deckopt` will be waiting under your **Non-Steam** library tab.
 
 ---
 
-## 4. Kullanım Adımları
+## Usage Workflow
 
-1. **API Anahtarı:** İlk açılışta ücretsiz edinebileceğiniz Gemini API anahtarınızı girin (Ekran klavyesi kısayolu: `Steam + X`).
-2. **Optimizasyon:** "Tüm oyunları optimize et" butonuna basın. Motor kütüphanedeki oyunları tarayarak profilleri üretir ve yerel veritabanında önbelleğe alır.
-3. **Uygulama:** Listeden bir oyunu seçin:
-   - Önerilen Kare Hızı, Yenileme Hızı, TDP ve GPU saat ayarlarını Steam'in sağ panelindeki **Quick Access (...) > Performans** menüsünden seçin.
-   - "Başlatma seçeneklerini panoya kopyala" butonuna basarak kopyaladığınız satırı oyunun **Özellikler > Başlatma Seçenekleri** alanına yapıştırın.
+1. **Enter API Key:** On first launch, enter your free Google Gemini API key (accessible via [Google AI Studio](https://aistudio.google.com/)). Press `Steam + X` to toggle the virtual keyboard.
+2. **Batch Optimize:** Click **Optimize All Games**. The engine scans your library and caches optimal profiles locally.
+3. **Apply Profile:** Select any game:
+   - Apply the recommended Frame Limit, Refresh Rate, TDP, and GPU Clock via the Steam **Quick Access (...) > Performance** menu.
+   - Click **Copy Launch Options to Clipboard** and paste the string into the game's **Properties > Launch Options**.
 
 ---
 
-## 5. Kaldırma (Uninstall)
+## Uninstallation
+
+To remove `deckopt` completely from your Steam Deck:
 
 ```bash
 curl -fsSL https://github.com/ozdil/deckopt/releases/latest/download/uninstall.sh | bash
 ```
 
-Profillerinizi ve API anahtarınızı korumak veya tamamen temizlemek sizin tercihinize bırakılır (`-y` parametresi ile tümü temizlenebilir).
+Pass `-y` to clean user profiles and API keys without interactive confirmation.
 
 ---
 
-## 6. Lisans ve Güvenlik
+## Contributing and Standards
 
-- Kod tabanında, belgelerde ve commit geçmişinde katı sıfır emoji kuralı uygulanmaktadır.
-- Tipografi: Varsayılan font `JetBrainsMono Nerd Font` standardındadır.
-- Katkıda bulunma kuralları için `CONTRIBUTING.md` belgesini inceleyiniz.
+- **Zero-Emoji Policy:** Strictly zero unicode emojis across code, documentation, and commits.
+- **Typography:** Primary default font family is `JetBrainsMono Nerd Font, JetBrains Mono, monospace`.
+- See [CONTRIBUTING.md](CONTRIBUTING.md) for full architecture and security guidelines.
+
+## License
+
+Released under the [MIT License](LICENSE).

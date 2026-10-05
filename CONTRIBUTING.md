@@ -1,16 +1,18 @@
-# Katkı ve Güvenlik Yönergeleri
+# Contributing and Security Standards
 
-Bu proje Valve Steam Deck (LCD/OLED) donanımları için tasarlanmış bağımsız bir açık kaynaklı optimizasyon aracıdır.
+This project is an independent open-source autonomous optimization engine engineered strictly for Valve Steam Deck hardware (LCD/OLED) running SteamOS 3.x.
 
-## Güvenlik İlkeleri
+## Security and Engineering Principles
 
-1. **Donanım Koruma Sınırları:**
-   - TDP sınırları: 3W ile 15W arasında zorunlu kırpılır.
-   - GPU saat sınırları: 200MHz ile 1600MHz arasında sınırlandırılır.
-   - Yenileme hızı: LCD için maksimum 60Hz, OLED için maksimum 90Hz.
-2. **Kullanıcı İzolasyonu:**
-   - API anahtarları yalnızca kullanıcının yerel cihazında (`user://gemini.key`) 0600 izinleriyle saklanır.
-   - Sunucusuz doğrudan bağlantı kullanılır.
-3. **Emoji ve Dil Standartları:**
-   - Kod tabanında, commit mesajlarında ve dokümanlarda sıfır emoji kuralı geçerlidir.
-   - Varsayılan yazı tipi: `JetBrainsMono Nerd Font`.
+1. **Hardware Safety Limits:**
+   - Thermal Design Power (TDP): Strictly clamped between 3W and 15W.
+   - GPU Clock Frequency: Constrained between 200MHz and 1600MHz.
+   - Refresh Rates: Maximum 60Hz on LCD panels, 90Hz on OLED panels.
+   - Frame Pacing: Exact integer divisor requirement (`refresh_hz % fps_limit == 0`).
+2. **User Isolation and Privacy:**
+   - API keys and profiles are stored locally on-device under `user://` with strict `0600` permissions.
+   - Direct client-to-Google HTTPS endpoints; zero intermediate telemetry servers.
+3. **Typography and Style:**
+   - Default typography: `JetBrainsMono Nerd Font, JetBrains Mono, monospace`.
+   - Zero-Emoji Policy: Absolutely zero unicode emojis in code, commits, or documentation.
+   - Primary language for GitHub repository documentation: US English (`en-US`).
