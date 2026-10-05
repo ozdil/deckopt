@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+build/
+dist/
+godot/.godot/
+*.tar.gz
+SHA256SUMS

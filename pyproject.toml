@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "deckopt"
+version = "0.1.0"
+description = "Valve Steam Deck AI-driven Autonomous Game Optimizer"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+deckopt = "deckopt.__main__:main"

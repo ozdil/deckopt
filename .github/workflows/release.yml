@@ -1,0 +1,53 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  GODOT_VERSION: "4.7.2"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Godot ve disa aktarma sablonlarini indir
+        run: |
+          base="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
+          curl -fsSL -o godot.zip "$base/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          curl -fsSL -o templates.tpz "$base/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          unzip -q godot.zip
+          mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" godot
+          dest="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          mkdir -p "$dest"
+          unzip -q templates.tpz
+          mv templates/* "$dest/"
+
+      - name: Linux build
+        run: |
+          mkdir -p build/linux
+          cd godot
+          ../godot --headless --import
+          ../godot --headless --export-release "SteamDeck" ../build/linux/deckopt.x86_64
+
+
+      - name: Paketle ve saglama toplami uret
+        run: |
+          mkdir -p dist/deckopt
+          cp build/linux/deckopt.x86_64 dist/deckopt/
+          cp packaging/icon.png dist/deckopt/ 2>/dev/null || true
+          tar -C dist -czf deckopt-linux-x86_64.tar.gz deckopt
+          sha256sum deckopt-linux-x86_64.tar.gz > SHA256SUMS
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            deckopt-linux-x86_64.tar.gz
+            SHA256SUMS
+            packaging/install.sh
+            packaging/uninstall.sh

@@ -1,0 +1,21 @@
+"AppBuild"
+{
+	"AppID" "0000000"
+	"Desc" "deckopt Steam Deck build"
+	"BuildOutput" "../build/steam_output/"
+	"ContentRoot" "../build/linux/"
+	"SetLive" ""
+	"Depots"
+	{
+		"0000001"
+		{
+			"FileMapping"
+			{
+				"LocalPath" "*"
+				"DepotPath" "."
+				"recursive" "1"
+			}
+			"FileExclusion" "*.pdb"
+		}
+	}
+}
